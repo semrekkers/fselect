@@ -1,3 +1,4 @@
+// Package fselect provides a simple struct field selector for preparing SQL queries.
 package fselect
 
 import (
@@ -23,15 +24,22 @@ const (
 )
 
 var (
-	ErrInvalidV           = errors.New("v is not a struct or pointer to struct")
+	// ErrInvalidV means that the argument v is not a struct or a pointer to a struct.
+	ErrInvalidV = errors.New("v is not a struct or pointer to struct")
+
+	// ErrSomeFieldsNotFound means that some fields you want to select where not found. Example:
+	// fselect.AllExcept(&MyStruct{}, "a field that does not exists in struct MyStruct")
+	//                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 	ErrSomeFieldsNotFound = errors.New("some fields wheren't found, check your field selection")
 )
 
+// Selection contains the selected fields.
 type Selection struct {
 	fieldNames  []string
 	fieldValues []interface{}
 }
 
+// All selects all fields of struct v.
 func All(v interface{}) *Selection {
 	value := reflect.Indirect(reflect.ValueOf(v))
 	if value.Kind() != reflect.Struct {
@@ -50,6 +58,7 @@ func All(v interface{}) *Selection {
 	return &s
 }
 
+// AllExcept selects all fields of struct v except the fields specified in variadic argument fields.
 func AllExcept(v interface{}, fields ...string) *Selection {
 	value := reflect.Indirect(reflect.ValueOf(v))
 	if value.Kind() != reflect.Struct {
@@ -79,6 +88,7 @@ func AllExcept(v interface{}, fields ...string) *Selection {
 	return &s
 }
 
+// Only selects only the fields of struct v specified in variadic argument fields.
 func Only(v interface{}, fields ...string) *Selection {
 	value := reflect.Indirect(reflect.ValueOf(v))
 	if value.Kind() != reflect.Struct {
@@ -109,18 +119,22 @@ func Only(v interface{}, fields ...string) *Selection {
 	return &s
 }
 
+// Fields returns all names of the selected fields.
 func (s *Selection) Fields() []string {
 	return s.fieldNames
 }
 
+// Args returns the values of all selected fields in order.
 func (s *Selection) Args() []interface{} {
 	return s.fieldValues
 }
 
+// FieldString returns all names of the selected fields seperated by const FieldSeperator.
 func (s *Selection) FieldString() string {
 	return strings.Join(s.fieldNames, FieldSeperator)
 }
 
+// BindVars returns const BindVar repeated n times where n is the amount of fields.
 func (s *Selection) BindVars() string {
 	return repeatString(BindVar, FieldSeperator, len(s.fieldNames))
 }

@@ -77,8 +77,8 @@ func TestFields(t *testing.T) {
 func TestFieldNames(t *testing.T) {
 	p := newPet()
 	s := AllExcept(p, "first_name")
-	if s.FieldString() != "last_name,age" {
-		t.Fatal(`assert: s.FieldString() != "last_name,age"`)
+	if s.FieldString() != "last_name, age" {
+		t.Fatal(`assert: s.FieldString() != "last_name, age"`)
 	}
 }
 
