@@ -99,8 +99,17 @@ func TestArgs(t *testing.T) {
 }
 
 func TestPreparef(t *testing.T) {
-	const expect = "INSERT INTO pets (first_name,last_name,age) VALUES (?,?,?)"
-	query := All(newPet()).Preparef("INSERT INTO pets (%s) VALUES (%s)")
+	const expect = "INSERT INTO pets (first_name, last_name, age) VALUES (?, ?, ?)"
+	query := All(newPet()).Preparef("INSERT INTO pets (%fields%) VALUES (%vars%)")
+
+	if query != expect {
+		t.Fatal(`assert: query != expect`)
+	}
+}
+
+func TestPreparefPartial(t *testing.T) {
+	const expect = "SELECT (first_name, last_name, age) FROM pets"
+	query := All(newPet()).Preparef("SELECT (%fields%) FROM pets")
 
 	if query != expect {
 		t.Fatal(`assert: query != expect`)

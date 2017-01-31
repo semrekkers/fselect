@@ -2,15 +2,24 @@ package fselect
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 )
 
 const (
-	StructTagKey   = "col"
-	FieldSeperator = ","
-	BindVar        = "?"
+	// StructTagKey is the struct field tag key.
+	StructTagKey = "col"
+
+	// FieldSeperator is the seperator between fields in a string.
+	FieldSeperator = ", "
+
+	// BindVar is the bind var to use. Only this MySQL bind var is supported right now.
+	BindVar = "?"
+)
+
+const (
+	fieldsVerb = "%fields%"
+	varsVerb   = "%vars%"
 )
 
 var (
@@ -116,6 +125,10 @@ func (s *Selection) BindVars() string {
 	return repeatString(BindVar, FieldSeperator, len(s.fieldNames))
 }
 
-func (s *Selection) Preparef(query string) string {
-	return fmt.Sprintf(query, s.FieldString(), s.BindVars())
+// Preparef prepares qeury q. Two verbs will be replaced multiple times:
+//    %fields% will be replaced with FieldString()
+//    %vars% will be replaced with BindVars()
+func (s *Selection) Preparef(q string) string {
+	prepared := strings.Replace(q, fieldsVerb, s.FieldString(), -1)
+	return strings.Replace(prepared, varsVerb, s.BindVars(), -1)
 }
