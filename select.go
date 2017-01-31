@@ -139,10 +139,10 @@ func (s *Selection) BindVars() string {
 	return repeatString(BindVar, FieldSeperator, len(s.fieldNames))
 }
 
-// Preparef prepares qeury q. Two verbs will be replaced multiple times:
+// Prepare prepares qeury q. Two verbs will be replaced multiple times:
 //    %fields% will be replaced with FieldString()
 //    %vars% will be replaced with BindVars()
-func (s *Selection) Preparef(q string) string {
+func (s *Selection) Prepare(q string) string {
 	prepared := strings.Replace(q, fieldsVerb, s.FieldString(), -1)
 	return strings.Replace(prepared, varsVerb, s.BindVars(), -1)
 }

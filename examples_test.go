@@ -63,7 +63,7 @@ func ExampleSelection_BindVars() {
 	// Output: ?, ?, ?, ?
 }
 
-func ExampleSelection_Preparef() {
+func ExampleSelection_Prepare() {
 	person := struct {
 		Nickname  string `col:"nickname"`
 		FirstName string `col:"first_name"`
@@ -74,8 +74,8 @@ func ExampleSelection_Preparef() {
 	// Select all fields of person.
 	s := All(&person)
 
-	selectQuery := s.Preparef("SELECT (%fields%) FROM persons")
-	insertQuery := s.Preparef("INSERT INTO persons (%fields%) VALUES (%vars%)")
+	selectQuery := s.Prepare("SELECT (%fields%) FROM persons")
+	insertQuery := s.Prepare("INSERT INTO persons (%fields%) VALUES (%vars%)")
 
 	fmt.Println("select query:", selectQuery)
 	fmt.Println("insert query:", insertQuery)
