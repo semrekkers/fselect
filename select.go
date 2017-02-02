@@ -140,7 +140,7 @@ func (s *Selection) BindVars() string {
 	return repeatString(BindVar, FieldSeperator, len(s.fieldNames))
 }
 
-// Prepare prepares qeury q. Two verbs will be replaced multiple times:
+// Prepare prepares query q. Two verbs will be replaced multiple times:
 //    %fields% will be replaced with FieldString()
 //    %vars% will be replaced with BindVars()
 func (s *Selection) Prepare(q string) string {
