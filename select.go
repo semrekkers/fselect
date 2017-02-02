@@ -21,6 +21,7 @@ const (
 const (
 	fieldsVerb = "%fields%"
 	varsVerb   = "%vars%"
+	ignoreCase = true
 )
 
 var (
@@ -58,7 +59,7 @@ func All(v interface{}) *Selection {
 	return &s
 }
 
-// AllExcept selects all fields of struct v except the fields specified in variadic argument fields.
+// AllExcept selects all fields of struct v except the fields specified in variadic argument fields. Differing cases are ignored.
 func AllExcept(v interface{}, fields ...string) *Selection {
 	value := reflect.Indirect(reflect.ValueOf(v))
 	if value.Kind() != reflect.Struct {
@@ -71,7 +72,7 @@ func AllExcept(v interface{}, fields ...string) *Selection {
 		fieldType := structType.Field(i)
 		fieldName := getFieldName(&fieldType)
 
-		if sliceContains(fieldName, fields) {
+		if sliceContains(fieldName, ignoreCase, fields) {
 			// Skip current field, goto next
 			continue
 		}
@@ -88,7 +89,7 @@ func AllExcept(v interface{}, fields ...string) *Selection {
 	return &s
 }
 
-// Only selects only the fields of struct v specified in variadic argument fields.
+// Only selects only the fields of struct v specified in variadic argument fields. Differing cases are ignored.
 func Only(v interface{}, fields ...string) *Selection {
 	value := reflect.Indirect(reflect.ValueOf(v))
 	if value.Kind() != reflect.Struct {
@@ -102,7 +103,7 @@ func Only(v interface{}, fields ...string) *Selection {
 		fieldName := getFieldName(&fieldType)
 
 		// NOTE: the ! before sliceContains
-		if !sliceContains(fieldName, fields) {
+		if !sliceContains(fieldName, ignoreCase, fields) {
 			// Skip current field, goto next
 			continue
 		}

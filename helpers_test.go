@@ -20,11 +20,19 @@ func TestGetFieldName(t *testing.T) {
 func TestSliceContains(t *testing.T) {
 	slice := []string{"aaa", "bbb", "ccc", "abc", "cba"}
 
-	if sliceContains("abcd", slice) {
+	if sliceContains("abcd", false, slice) {
 		t.Fatal(`"abcd" doesn't exist in slice`)
 	}
-	if !sliceContains("cba", slice) {
+	if !sliceContains("cba", false, slice) {
 		t.Fatal(`"cba" does exist in slice`)
+	}
+
+	// Test ignore case
+	if sliceContains("ABCD", true, slice) {
+		t.Fatal(`"ABCD" (ignore case) doesn't exist in slice`)
+	}
+	if !sliceContains("CbA", true, slice) {
+		t.Fatal(`"CbA" (ignore case) does exist in slice`)
 	}
 }
 

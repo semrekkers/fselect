@@ -1,6 +1,9 @@
 package fselect
 
-import "reflect"
+import (
+	"reflect"
+	"strings"
+)
 
 // getFieldName returns the name of a struct field.
 func getFieldName(v *reflect.StructField) string {
@@ -14,10 +17,13 @@ func getFieldName(v *reflect.StructField) string {
 	return name
 }
 
-// sliceContains returns whether slice contains v.
-func sliceContains(v string, slice []string) bool {
+// sliceContains returns whether slice contains v. If ignoreCase is true then differing cases will be ignored.
+func sliceContains(v string, ignoreCase bool, slice []string) bool {
 	for _, str := range slice {
-		if str == v {
+		if !ignoreCase && str == v {
+			return true
+		}
+		if ignoreCase && strings.EqualFold(v, str) {
 			return true
 		}
 	}
