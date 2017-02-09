@@ -44,6 +44,15 @@ func TestRepeatString(t *testing.T) {
 	}
 }
 
+func TestJoinStringsWithSuffix(t *testing.T) {
+	const expect = "test and succeed, play and succeed, program and succeed"
+
+	set := []string{"test", "play", "program"}
+	if joinStringsWithSuffix(set, " and succeed", ", ") != expect {
+		t.Fail()
+	}
+}
+
 func newPerson() *Person {
 	return &Person{"John", "Doe", 21}
 }

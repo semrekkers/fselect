@@ -43,3 +43,24 @@ func repeatString(v string, sep string, n int) string {
 
 	return string(out)
 }
+
+// joinStringsWithSuffix joins all strings in v concatenated with suffix and seperated by sep.
+func joinStringsWithSuffix(v []string, suffix string, sep string) string {
+	// calculate length of all strings
+	var length int
+	for _, str := range v {
+		length += len(str)
+	}
+	length += (len(suffix) * len(v)) + (len(sep) * (len(v) - 1))
+
+	out := make([]byte, length)
+	cursor := copy(out, v[0])
+	cursor += copy(out[cursor:], suffix)
+	for i := 1; i < len(v); i++ {
+		cursor += copy(out[cursor:], sep)
+		cursor += copy(out[cursor:], v[i])
+		cursor += copy(out[cursor:], suffix)
+	}
+
+	return string(out)
+}

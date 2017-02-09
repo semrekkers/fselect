@@ -98,6 +98,16 @@ func TestArgs(t *testing.T) {
 	}
 }
 
+func TestArgsAnd(t *testing.T) {
+	additional := "additional_value"
+	p := newPerson()
+	s := All(p)
+	args := s.ArgsAnd(additional)
+	if args[len(args)-1] != additional {
+		t.Fatal(`assert: args[len(args)-1] != additional`)
+	}
+}
+
 func TestPrepare(t *testing.T) {
 	const expect = "INSERT INTO pets (first_name, last_name, age) VALUES (?, ?, ?)"
 	query := All(newPet()).Prepare("INSERT INTO pets (%fields%) VALUES (%vars%)")

@@ -16,12 +16,15 @@ const (
 
 	// BindVar is the bind var to use. Only this MySQL bind var is supported right now.
 	BindVar = "?"
+
+	fieldUpdateSuffix = " = " + BindVar
 )
 
 const (
-	fieldsVerb = "%fields%"
-	varsVerb   = "%vars%"
-	ignoreCase = true
+	fieldsVerb  = "%fields%"
+	varsVerb    = "%vars%"
+	updatesVerb = "%updates%"
+	ignoreCase  = true
 )
 
 var (
@@ -130,6 +133,15 @@ func (s *Selection) Args() []interface{} {
 	return s.fieldValues
 }
 
+// ArgsAnd returns the values of all selected fields in order concatenated with v.
+func (s *Selection) ArgsAnd(v ...interface{}) []interface{} {
+	fieldCount := len(s.fieldValues)
+	args := make([]interface{}, fieldCount, fieldCount+len(v))
+	copy(args, s.fieldValues)
+	args = append(args, v...)
+	return args
+}
+
 // FieldString returns all names of the selected fields seperated by const FieldSeperator.
 func (s *Selection) FieldString() string {
 	return strings.Join(s.fieldNames, FieldSeperator)
@@ -140,10 +152,18 @@ func (s *Selection) BindVars() string {
 	return repeatString(BindVar, FieldSeperator, len(s.fieldNames))
 }
 
+// FieldUpdates returns the struct in UPDATE SET statement style.
+func (s *Selection) FieldUpdates() string {
+	return joinStringsWithSuffix(s.fieldNames, fieldUpdateSuffix, FieldSeperator)
+}
+
 // Prepare prepares query q. Two verbs will be replaced multiple times:
-//    %fields% will be replaced with FieldString()
-//    %vars% will be replaced with BindVars()
+//    %fields% will be replaced with the output of FieldString()
+//    %vars% will be replaced with the output of BindVars()
+//    %updates% will be replaced with the output of FieldUpdates()
 func (s *Selection) Prepare(q string) string {
 	prepared := strings.Replace(q, fieldsVerb, s.FieldString(), -1)
-	return strings.Replace(prepared, varsVerb, s.BindVars(), -1)
+	prepared = strings.Replace(prepared, varsVerb, s.BindVars(), -1)
+	prepared = strings.Replace(prepared, updatesVerb, s.FieldUpdates(), -1)
+	return prepared
 }
