@@ -1,169 +1,143 @@
-// Package fselect provides a simple struct field selector for preparing SQL queries.
-package fselect
+// Package qbuilder implements a simple, fast and easy-to-use query builder for jmoiron/sqlx.
+package qbuilder
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
-	"strings"
-)
-
-const (
-	// StructTagKey is the struct field tag key.
-	StructTagKey = "col"
-
-	// FieldSeperator is the seperator between fields in a string.
-	FieldSeperator = ", "
-
-	// BindVar is the bind var to use. Only this MySQL bind var is supported right now.
-	BindVar = "?"
-
-	fieldUpdateSuffix = " = " + BindVar
-)
-
-const (
-	fieldsVerb  = "%fields%"
-	varsVerb    = "%vars%"
-	updatesVerb = "%updates%"
-	ignoreCase  = true
 )
 
 var (
-	// ErrInvalidV means that the argument v is not a struct or a pointer to a struct.
-	ErrInvalidV = errors.New("v is not a struct or pointer to struct")
+	// ErrNotStructKind means that the given argument to Select() is not a struct kind.
+	ErrNotStructKind = errors.New("argument is not a struct kind")
 
-	// ErrSomeFieldsNotFound means that some fields you want to select where not found. Example:
-	// fselect.AllExcept(&MyStruct{}, "a field that does not exists in struct MyStruct")
-	//                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-	ErrSomeFieldsNotFound = errors.New("some fields wheren't found, check your field selection")
+	// ErrFilterSet means that filters were already set.
+	ErrFilterSet = errors.New("filters already set")
 )
 
-// Selection contains the selected fields.
+const (
+	defaultTagKey         = "db"
+	defaultTypeTagKey     = "type"
+	defaultFieldSeparator = ", "
+	defaultBindVar        = "?"
+)
+
+// Selection contains the selected fields and options.
 type Selection struct {
-	fieldNames  []string
-	fieldValues []interface{}
+	structType         reflect.Type
+	filterSet          []string
+	filterInclude      bool
+	tagKey, typeTagKey string
+	options            formatOptions
 }
 
-// All selects all fields of struct v.
-func All(v interface{}) *Selection {
-	value := reflect.Indirect(reflect.ValueOf(v))
+// Select selecs all the fields of s and returns a Selection.
+func Select(s interface{}) *Selection {
+	value := reflect.Indirect(reflect.ValueOf(s))
 	if value.Kind() != reflect.Struct {
-		panic(ErrInvalidV)
+		panic(ErrNotStructKind)
 	}
-	structType := value.Type()
+	return &Selection{
+		structType: value.Type(),
+		tagKey:     defaultTagKey,
+		typeTagKey: defaultTypeTagKey,
 
-	var s Selection
-	for i := 0; i < value.NumField(); i++ {
-		fieldValue := value.Field(i)
-		fieldType := structType.Field(i)
-		s.fieldNames = append(s.fieldNames, getFieldName(&fieldType))
-		s.fieldValues = append(s.fieldValues, fieldValue.Interface())
+		options: formatOptions{
+			fieldSeparator: defaultFieldSeparator,
+			bindVar:        defaultBindVar,
+		},
 	}
-
-	return &s
 }
 
-// AllExcept selects all fields of struct v except the fields specified in variadic argument fields. Differing cases are ignored.
-func AllExcept(v interface{}, fields ...string) *Selection {
-	value := reflect.Indirect(reflect.ValueOf(v))
-	if value.Kind() != reflect.Struct {
-		panic(ErrInvalidV)
+// Exclude excludes fields from Selection.
+func (s *Selection) Exclude(fields ...string) *Selection {
+	if s.filterSet != nil {
+		panic(ErrFilterSet)
 	}
-	structType := value.Type()
+	s.filterSet = fields
+	return s
+}
 
-	var s Selection
-	for i := 0; i < value.NumField(); i++ {
-		fieldType := structType.Field(i)
-		fieldName := getFieldName(&fieldType)
+// Only excludes all the fields in the current Selection except fields.
+func (s *Selection) Only(fields ...string) *Selection {
+	if s.filterSet != nil {
+		panic(ErrFilterSet)
+	}
+	s.filterSet = fields
+	s.filterInclude = true
+	return s
+}
 
-		if sliceContains(fieldName, ignoreCase, fields) {
-			// Skip current field, goto next
-			continue
+// TagKey sets the struct field tag key to use for this Selection.
+func (s *Selection) TagKey(v string) *Selection {
+	s.tagKey = v
+	return s
+}
+
+// TypeTagKey sets the struct field tag key for types to use in this Selection.
+func (s *Selection) TypeTagKey(v string) *Selection {
+	s.typeTagKey = v
+	return s
+}
+
+// FieldSeparator sets the field separator for the formatter.
+func (s *Selection) FieldSeparator(v string) *Selection {
+	s.options.fieldSeparator = v
+	return s
+}
+
+// BindVar sets the bind variable placeholder for the formatter.
+func (s *Selection) BindVar(v string) *Selection {
+	s.options.bindVar = v
+	return s
+}
+
+// Formatter builds and returns the Formatter for this Selection.
+func (s *Selection) Formatter() *Formatter {
+	return s.buildFormatter()
+}
+
+// Fmt builds the formatter for this Selection and returns a formatted string.
+func (s *Selection) Fmt(format string) string {
+	return s.buildFormatter().Fmt(format)
+}
+
+func (s *Selection) buildFormatter() (f *Formatter) {
+	numField := s.structType.NumField()
+	expectNumField := numField
+	if s.filterSet != nil && s.filterInclude {
+		expectNumField = len(s.filterSet)
+	} else if s.filterSet != nil {
+		expectNumField -= len(s.filterSet)
+	}
+	f = &Formatter{
+		fieldNames: make([]string, 0, expectNumField),
+		fieldTypes: make([]string, 0, expectNumField),
+		options:    s.options,
+	}
+
+	for i := 0; i < numField; i++ {
+		structField := s.structType.Field(i)
+		fieldName := structField.Name
+		if tagValue, ok := structField.Tag.Lookup(s.tagKey); ok {
+			fieldName = tagValue
 		}
-
-		fieldValue := value.Field(i)
-		s.fieldNames = append(s.fieldNames, fieldName)
-		s.fieldValues = append(s.fieldValues, fieldValue.Interface())
-	}
-
-	if len(s.fieldNames) != value.NumField()-len(fields) {
-		panic(ErrSomeFieldsNotFound)
-	}
-
-	return &s
-}
-
-// Only selects only the fields of struct v specified in variadic argument fields. Differing cases are ignored.
-func Only(v interface{}, fields ...string) *Selection {
-	value := reflect.Indirect(reflect.ValueOf(v))
-	if value.Kind() != reflect.Struct {
-		panic(ErrInvalidV)
-	}
-	structType := value.Type()
-
-	var s Selection
-	for i := 0; i < value.NumField(); i++ {
-		fieldType := structType.Field(i)
-		fieldName := getFieldName(&fieldType)
-
-		// NOTE: the ! before sliceContains
-		if !sliceContains(fieldName, ignoreCase, fields) {
-			// Skip current field, goto next
-			continue
+		if s.filterSet != nil {
+			fieldInSet := sliceContains(fieldName, s.filterSet)
+			if (fieldInSet && !s.filterInclude) || (!fieldInSet && s.filterInclude) {
+				// field is filtered out
+				continue
+			}
 		}
-
-		fieldValue := value.Field(i)
-		s.fieldNames = append(s.fieldNames, fieldName)
-		s.fieldValues = append(s.fieldValues, fieldValue.Interface())
+		var fieldType string
+		if tagValue, ok := structField.Tag.Lookup(s.typeTagKey); ok {
+			fieldType = tagValue
+		}
+		f.fieldNames = append(f.fieldNames, fieldName)
+		f.fieldTypes = append(f.fieldTypes, fieldType)
 	}
-
-	if len(s.fieldNames) != len(fields) {
-		panic(ErrSomeFieldsNotFound)
+	if len(f.fieldNames) != expectNumField {
+		panic(fmt.Errorf("expected %d fields, have %d, please check your filters", expectNumField, len(f.fieldNames)))
 	}
-
-	return &s
-}
-
-// Fields returns all names of the selected fields.
-func (s *Selection) Fields() []string {
-	return s.fieldNames
-}
-
-// Args returns the values of all selected fields in order.
-func (s *Selection) Args() []interface{} {
-	return s.fieldValues
-}
-
-// ArgsAnd returns the values of all selected fields in order concatenated with v.
-func (s *Selection) ArgsAnd(v ...interface{}) []interface{} {
-	fieldCount := len(s.fieldValues)
-	args := make([]interface{}, fieldCount, fieldCount+len(v))
-	copy(args, s.fieldValues)
-	args = append(args, v...)
-	return args
-}
-
-// FieldString returns all names of the selected fields seperated by const FieldSeperator.
-func (s *Selection) FieldString() string {
-	return strings.Join(s.fieldNames, FieldSeperator)
-}
-
-// BindVars returns const BindVar repeated n times where n is the amount of fields.
-func (s *Selection) BindVars() string {
-	return repeatString(BindVar, FieldSeperator, len(s.fieldNames))
-}
-
-// FieldUpdates returns the struct in UPDATE SET statement style.
-func (s *Selection) FieldUpdates() string {
-	return joinStringsWithSuffix(s.fieldNames, fieldUpdateSuffix, FieldSeperator)
-}
-
-// Prepare prepares query q. Two verbs will be replaced multiple times:
-//    %fields% will be replaced with the output of FieldString()
-//    %vars% will be replaced with the output of BindVars()
-//    %updates% will be replaced with the output of FieldUpdates()
-func (s *Selection) Prepare(q string) string {
-	prepared := strings.Replace(q, fieldsVerb, s.FieldString(), -1)
-	prepared = strings.Replace(prepared, varsVerb, s.BindVars(), -1)
-	prepared = strings.Replace(prepared, updatesVerb, s.FieldUpdates(), -1)
-	return prepared
+	return
 }

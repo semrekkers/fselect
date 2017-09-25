@@ -1,127 +1,150 @@
-package fselect
+package qbuilder
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
-const errInvalidValue = "value is not a struct or pointer to struct"
-
-type Person struct {
-	FirstName string
-	LastName  string
-	Age       int
+type testObj struct {
+	ID       string `type:"INT NOT NULL"`
+	User     string `type:"VARCHAR(255) NOT NULL"`
+	Password []byte `type:"VARBINARY(255) NOT NULL"`
+	Bio      string `db:"user_bio" type:"VARCHAR(255)"`
+	Website  string `db:"user_website"`
 }
 
-type Pet struct {
-	FirstName string `col:"first_name"`
-	LastName  string `col:"last_name"`
-	Age       int    `col:"age"`
+func TestSelect(t *testing.T) {
+	obj := testObj{}
+	s := Select(&obj)
+	if s.structType != reflect.TypeOf(obj) {
+		t.Error("failed")
+	}
 }
 
-func TestInvalidVAll(t *testing.T) {
+func TestSelectDefaults(t *testing.T) {
+	s := Select(testObj{})
+	if s.tagKey != defaultTagKey {
+		t.Error("tagKey")
+	}
+	if s.typeTagKey != defaultTypeTagKey {
+		t.Error("typeTagKey")
+	}
+	if s.options.fieldSeparator != defaultFieldSeparator {
+		t.Error("fieldSeparator")
+	}
+	if s.options.bindVar != defaultBindVar {
+		t.Error("bindVar")
+	}
+}
+
+func TestFalseSelect(t *testing.T) {
 	defer func() {
-		if err := recover(); err != ErrInvalidV {
-			t.Fatal("Expected ErrInvalidV")
+		if err := recover(); err != ErrNotStructKind {
+			t.Fatal("Expected ErrNotStructKind")
+		}
+	}()
+	Select(0)
+}
+
+func TestExclude(t *testing.T) {
+	s := Select(testObj{}).Exclude("ID")
+	if !sliceContains("ID", s.filterSet) {
+		t.Error("Field ID not found in filterSet")
+	}
+	if s.filterInclude {
+		t.Error("filterInclude is set")
+	}
+}
+
+func TestExcludeFail(t *testing.T) {
+	defer func() {
+		if err := recover(); err != ErrFilterSet {
+			t.Fatal("Expected ErrFilterSet")
+		}
+	}()
+	Select(testObj{}).Exclude("ID").Exclude("User")
+}
+
+func TestOnly(t *testing.T) {
+	s := Select(testObj{}).Only("ID")
+	if !sliceContains("ID", s.filterSet) {
+		t.Error("Field ID not found in filterSet")
+	}
+	if len(s.filterSet) != 1 {
+		t.Error("Too many fields in filterSet")
+	}
+	if !s.filterInclude {
+		t.Error("filterInclude is not set")
+	}
+}
+
+func TestOnlyFail(t *testing.T) {
+	defer func() {
+		if err := recover(); err != ErrFilterSet {
+			t.Fatal("Expected ErrFilterSet")
+		}
+	}()
+	Select(testObj{}).Only("ID").Only("User")
+}
+
+func TestBuildFormatter(t *testing.T) {
+	fieldNames := []string{"ID", "User", "Password", "user_bio", "user_website"}
+	fieldTypes := []string{"INT NOT NULL", "VARCHAR(255) NOT NULL", "VARBINARY(255) NOT NULL", "VARCHAR(255)", ""}
+
+	f := Select(testObj{}).Formatter()
+	if !sliceEqual(fieldNames, f.fieldNames) {
+		t.Errorf("failed, got: %#v, want: %#v", f.fieldNames, fieldNames)
+	}
+	if !sliceEqual(fieldTypes, f.fieldTypes) {
+		t.Errorf("failed, got: %#v, want: %#v", f.fieldTypes, fieldTypes)
+	}
+}
+
+func TestBuildFormatterFilterExclude(t *testing.T) {
+	fieldNames := []string{"User", "Password", "user_bio", "user_website"}
+	fieldTypes := []string{"VARCHAR(255) NOT NULL", "VARBINARY(255) NOT NULL", "VARCHAR(255)", ""}
+
+	f := Select(testObj{}).Exclude("ID").Formatter()
+	if !sliceEqual(fieldNames, f.fieldNames) {
+		t.Errorf("failed, got: %#v, want: %#v", f.fieldNames, fieldNames)
+	}
+	if !sliceEqual(fieldTypes, f.fieldTypes) {
+		t.Errorf("failed, got: %#v, want: %#v", f.fieldTypes, fieldTypes)
+	}
+}
+
+func TestBuildFormatterFilterOnly(t *testing.T) {
+	fieldNames := []string{"User", "user_bio"}
+	fieldTypes := []string{"VARCHAR(255) NOT NULL", "VARCHAR(255)"}
+
+	f := Select(testObj{}).Only("User", "user_bio").Formatter()
+	if !sliceEqual(fieldNames, f.fieldNames) {
+		t.Errorf("failed, got: %#v, want: %#v", f.fieldNames, fieldNames)
+	}
+	if !sliceEqual(fieldTypes, f.fieldTypes) {
+		t.Errorf("failed, got: %#v, want: %#v", f.fieldTypes, fieldTypes)
+	}
+}
+
+func TestBuildFormatterFail(t *testing.T) {
+	defer func() {
+		if err := recover(); err == nil {
+			t.Fatal("Expected err")
 		}
 	}()
 
-	All(0)
+	Select(testObj{}).Exclude("This doesn't exists").Formatter()
+	Select(testObj{}).Only("This doesn't exists").Formatter()
 }
 
-func TestInvalidVAllExcept(t *testing.T) {
-	defer func() {
-		if err := recover(); err != ErrInvalidV {
-			t.Fatal("Expected ErrInvalidV")
+func sliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		if a[i] != b[i] {
+			return false
 		}
-	}()
-
-	AllExcept(0)
-}
-
-func TestInvalidVOnly(t *testing.T) {
-	defer func() {
-		if err := recover(); err != ErrInvalidV {
-			t.Fatal("Expected ErrInvalidV")
-		}
-	}()
-
-	Only(0)
-}
-
-func TestFieldsNotFoundAllExcept(t *testing.T) {
-	defer func() {
-		if err := recover(); err != ErrSomeFieldsNotFound {
-			t.Fatal("Expected ErrSomeFieldsNotFound")
-		}
-	}()
-
-	AllExcept(newPerson(), "this is an invalid field")
-}
-
-func TestFieldsNotFoundOnly(t *testing.T) {
-	defer func() {
-		if err := recover(); err != ErrSomeFieldsNotFound {
-			t.Fatal("Expected ErrSomeFieldsNotFound")
-		}
-	}()
-
-	Only(newPerson(), "this is an invalid field")
-}
-
-func TestFields(t *testing.T) {
-	p := newPerson()
-	s := All(p)
-	if s.Fields()[2] != "Age" {
-		t.Fatal(`assert: s.Fields()[2] != "Age"`)
 	}
-}
-
-func TestFieldNames(t *testing.T) {
-	p := newPet()
-	s := AllExcept(p, "first_name")
-	if s.FieldString() != "last_name, age" {
-		t.Fatal(`assert: s.FieldString() != "last_name, age"`)
-	}
-}
-
-func TestBindVars(t *testing.T) {
-	p := newPerson()
-	s := Only(p, "Age")
-	if s.BindVars() != "?" {
-		t.Fatal(`assert: s.BindVars() != "?"`)
-	}
-}
-
-func TestArgs(t *testing.T) {
-	p := newPet()
-	s := Only(p, "last_name")
-	if s.Args()[0] != p.LastName {
-		t.Fatal(`assert: s.Args()[0] != p.LastName`)
-	}
-}
-
-func TestArgsAnd(t *testing.T) {
-	additional := "additional_value"
-	p := newPerson()
-	s := All(p)
-	args := s.ArgsAnd(additional)
-	if args[len(args)-1] != additional {
-		t.Fatal(`assert: args[len(args)-1] != additional`)
-	}
-}
-
-func TestPrepare(t *testing.T) {
-	const expect = "INSERT INTO pets (first_name, last_name, age) VALUES (?, ?, ?)"
-	query := All(newPet()).Prepare("INSERT INTO pets (%fields%) VALUES (%vars%)")
-
-	if query != expect {
-		t.Fatal(`assert: query != expect`)
-	}
-}
-
-func TestPreparePartial(t *testing.T) {
-	const expect = "SELECT (first_name, last_name, age) FROM pets"
-	query := All(newPet()).Prepare("SELECT (%fields%) FROM pets")
-
-	if query != expect {
-		t.Fatal(`assert: query != expect`)
-	}
+	return true
 }

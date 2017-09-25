@@ -1,36 +1,18 @@
-package fselect
+package qbuilder
 
-import (
-	"reflect"
-	"strings"
-)
+import "bytes"
 
-// getFieldName returns the name of a struct field.
-func getFieldName(v *reflect.StructField) string {
-	name := v.Name
-
-	if tag, ok := v.Tag.Lookup(StructTagKey); ok {
-		// The field has a tag like `col:"<name>"`, use this <name> instead.
-		name = tag
-	}
-
-	return name
-}
-
-// sliceContains returns whether slice contains v. If ignoreCase is true then differing cases will be ignored.
-func sliceContains(v string, ignoreCase bool, slice []string) bool {
+// sliceContains returns whether the string slice contains v.
+func sliceContains(v string, slice []string) bool {
 	for _, str := range slice {
-		if !ignoreCase && str == v {
-			return true
-		}
-		if ignoreCase && strings.EqualFold(v, str) {
+		if str == v {
 			return true
 		}
 	}
 	return false
 }
 
-// repeatString repeats string v with seperator sep, n times.
+// repeatString repeats string v, with separator sep, n times.
 func repeatString(v string, sep string, n int) string {
 	stringLen := (len(v) * n) + (len(sep) * (n - 1))
 	out := make([]byte, stringLen)
@@ -44,7 +26,7 @@ func repeatString(v string, sep string, n int) string {
 	return string(out)
 }
 
-// joinStringsWithSuffix joins all strings in v concatenated with suffix and seperated by sep.
+// joinStringsWithSuffix joins all strings in v concatenated with suffix and separated by sep.
 func joinStringsWithSuffix(v []string, suffix string, sep string) string {
 	// calculate length of all strings
 	var length int
@@ -63,4 +45,18 @@ func joinStringsWithSuffix(v []string, suffix string, sep string) string {
 	}
 
 	return string(out)
+}
+
+func joinTwoSlices(a, b []string, suffix, sep string) string {
+	var buf bytes.Buffer
+	lastI := len(a) - 1
+	for i := 0; i < len(a); i++ {
+		buf.WriteString(a[i])
+		buf.WriteString(suffix)
+		buf.WriteString(b[i])
+		if i < lastI {
+			buf.WriteString(sep)
+		}
+	}
+	return buf.String()
 }
